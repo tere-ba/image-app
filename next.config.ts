@@ -1,17 +1,27 @@
 import type { NextConfig } from "next";
 
+const isDev = process.env.NODE_ENV !== "production";
+
+// Next.js dev mode needs 'unsafe-eval' (webpack HMR) and websocket 'connect-src'
+// for Fast Refresh. Production locks both down.
+const scriptSrc = isDev
+  ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+  : "script-src 'self' 'unsafe-inline'";
+const connectSrc = isDev
+  ? "connect-src 'self' ws: wss:"
+  : "connect-src 'self'";
+
 const securityHeaders = [
   {
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      // Next injects inline runtime config; allow it. In prod-prod consider nonces.
-      "script-src 'self' 'unsafe-inline'",
+      scriptSrc,
       "style-src 'self' 'unsafe-inline'",
       // Blob URLs are used to render the fused image and previews.
       "img-src 'self' blob: data:",
       "font-src 'self' data:",
-      "connect-src 'self'",
+      connectSrc,
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",

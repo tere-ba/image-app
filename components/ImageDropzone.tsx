@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { validateImageFile } from "@/lib/validate";
 
 type Props = {
@@ -10,7 +10,6 @@ type Props = {
 };
 
 export function ImageDropzone({ label, onChange, disabled }: Props) {
-  const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -48,19 +47,38 @@ export function ImageDropzone({ label, onChange, disabled }: Props) {
     onChange(file, null);
   }
 
-  function clear() {
+  function openPicker() {
+    if (disabled) return;
+    inputRef.current?.click();
+  }
+
+  function clear(e: React.MouseEvent) {
+    e.stopPropagation();
     if (inputRef.current) inputRef.current.value = "";
     handleFile(null);
   }
 
+  function onKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      openPicker();
+    }
+  }
+
   return (
     <div className="flex flex-col gap-2">
-      <label htmlFor={inputId} className="text-sm font-medium text-neutral-700">
-        {label}
-      </label>
+      <span className="text-sm font-medium text-neutral-700">{label}</span>
 
       <div
-        className={`relative flex h-56 items-center justify-center rounded-lg border-2 border-dashed transition ${
+        role="button"
+        tabIndex={disabled ? -1 : 0}
+        aria-label={`Upload ${label}`}
+        aria-disabled={disabled}
+        onClick={openPicker}
+        onKeyDown={onKeyDown}
+        className={`relative flex h-56 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed transition focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:ring-offset-2 ${
+          disabled ? "cursor-not-allowed opacity-60" : ""
+        } ${
           localError
             ? "border-red-400 bg-red-50"
             : preview
@@ -86,22 +104,19 @@ export function ImageDropzone({ label, onChange, disabled }: Props) {
             </button>
           </>
         ) : (
-          <label
-            htmlFor={inputId}
-            className="cursor-pointer text-center text-sm text-neutral-500"
-          >
+          <div className="pointer-events-none text-center text-sm text-neutral-500">
             <div className="font-medium text-neutral-700">Click to upload</div>
             <div className="mt-1 text-xs">JPEG or WebP · max 5 MB</div>
-          </label>
+          </div>
         )}
 
         <input
           ref={inputRef}
-          id={inputId}
           type="file"
           accept="image/jpeg,image/webp"
           className="sr-only"
           disabled={disabled}
+          tabIndex={-1}
           onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
         />
       </div>

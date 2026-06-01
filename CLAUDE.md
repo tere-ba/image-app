@@ -45,6 +45,8 @@ The server route exists specifically to keep the n8n call off the browser (avoid
 
 **Security headers** are set globally in `next.config.ts` (CSP, HSTS, X-Frame-Options DENY, nosniff, Referrer-Policy, Permissions-Policy, COOP, `poweredByHeader: false`). The CSP allows `img-src blob:` because previews and the fused result are rendered from `URL.createObjectURL`. If you add external scripts/styles/fonts/APIs, widen the relevant directive explicitly rather than loosening `default-src`.
 
+**CSP dev vs prod (gotcha):** `script-src` adds `'unsafe-eval'` and `connect-src` adds `ws:`/`wss:` only when `NODE_ENV !== "production"`. Without them, webpack HMR and Fast Refresh are blocked, the client bundle never hydrates, and every `onClick` silently no-ops (the page loads but feels frozen). Production keeps both locked down. If `onClick` handlers stop working in dev, suspect CSP first — DevTools console will show eval/ws violations.
+
 **Object URL lifecycle:** previews (`ImageDropzone`) and the final result (`page.tsx`) both create blob URLs via `URL.createObjectURL`. Both revoke on unmount and on replacement — preserve this when editing or memory will leak.
 
 ## Conventions
@@ -52,3 +54,4 @@ The server route exists specifically to keep the n8n call off the browser (avoid
 - Path alias `@/*` is configured in `tsconfig.json` — import as `@/lib/...`, `@/components/...`.
 - The `app/api/fuse/route.ts` handler must stay on the Node runtime (`export const runtime = "nodejs"`) — Edge has stricter multipart body limits.
 - Plain `<img>` is used (with `eslint-disable-next-line @next/next/no-img-element`) because the fused result is an in-memory blob URL, not something `next/image` can optimize.
+- `ImageDropzone` uses `role="button"` + `inputRef.click()` rather than `<label htmlFor>` association. The earlier `useId()`-based labels were flaky (colon-containing IDs). Inner text uses `pointer-events-none` so clicks reach the dropzone div; the Remove button uses `stopPropagation` so it doesn't re-open the picker.
