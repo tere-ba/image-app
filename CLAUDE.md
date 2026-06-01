@@ -34,7 +34,16 @@ The server route exists specifically to keep the n8n call off the browser (avoid
 
 **Error contract (`lib/constants.ts → ERROR_MESSAGES`):** the UI displays these strings verbatim. Always reuse the constants — do not introduce new error wording. Both client (`lib/validate.ts`) and server (`app/api/fuse/route.ts`) re-run the same `validateImageFile` check; keep them in sync via the shared `lib/`.
 
-**Config:** `N8N_WEBHOOK_URL` reads from `process.env.N8N_WEBHOOK_URL` with a hardcoded fallback in `lib/constants.ts`. For production (Vercel) set the env var rather than editing the fallback.
+**Config:** `N8N_WEBHOOK_URL` is **required** — read in `lib/server-config.ts`, which throws at boot if unset. Local dev uses `.env.local` (gitignored, see `.env.example`); production sets it in the hosting provider's env config. Never reintroduce a hardcoded fallback in `lib/constants.ts` — that file is reachable from client code and would leak the URL into the bundle.
+
+**Module split (security-critical):**
+- `lib/constants.ts` — shared client + server (UI strings, validation limits). Safe to import anywhere.
+- `lib/server-config.ts` — marked `import "server-only"`; holds the webhook URL, upstream timeout, and response-type allowlist. Importing it from a client component is a build error by design.
+- `lib/magic.ts` — server-side magic-byte sniffing (`sniffImageType`). The client-supplied multipart MIME header is not trusted; the route re-verifies actual file bytes.
+
+**API route hardening (`app/api/fuse/route.ts`):** same-origin check (Origin vs Host), `content-length` cap before parsing, per-file size check, magic-byte sniff, sanitized outbound filenames, `redirect: "error"` on the upstream fetch, and an allowlist of upstream content-types before streaming back. Keep these — they're load-bearing, not decorative.
+
+**Security headers** are set globally in `next.config.ts` (CSP, HSTS, X-Frame-Options DENY, nosniff, Referrer-Policy, Permissions-Policy, COOP, `poweredByHeader: false`). The CSP allows `img-src blob:` because previews and the fused result are rendered from `URL.createObjectURL`. If you add external scripts/styles/fonts/APIs, widen the relevant directive explicitly rather than loosening `default-src`.
 
 **Object URL lifecycle:** previews (`ImageDropzone`) and the final result (`page.tsx`) both create blob URLs via `URL.createObjectURL`. Both revoke on unmount and on replacement — preserve this when editing or memory will leak.
 
