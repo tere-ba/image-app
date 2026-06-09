@@ -7,9 +7,12 @@ const isDev = process.env.NODE_ENV !== "production";
 const scriptSrc = isDev
   ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
   : "script-src 'self' 'unsafe-inline'";
+// The browser Supabase client calls the project URL directly (signup/login),
+// so it must be allowed in connect-src in both dev and prod.
+const SUPABASE_URL = "https://pudxvyrjnjgadoqvoycl.supabase.co";
 const connectSrc = isDev
-  ? "connect-src 'self' ws: wss:"
-  : "connect-src 'self'";
+  ? `connect-src 'self' ${SUPABASE_URL} ws: wss:`
+  : `connect-src 'self' ${SUPABASE_URL}`;
 
 const securityHeaders = [
   {

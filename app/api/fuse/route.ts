@@ -7,6 +7,7 @@ import {
   N8N_WEBHOOK_URL,
 } from "@/lib/server-config";
 import { sniffImageType } from "@/lib/magic";
+import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,7 +36,16 @@ export async function POST(req: Request) {
     return errorResponse(ERROR_MESSAGES.network, 403);
   }
 
-  // 2. Reject obviously oversized requests before parsing the body.
+  // 2. Require an authenticated session — the fusion tool is login-gated.
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return errorResponse(ERROR_MESSAGES.network, 401);
+  }
+
+  // 3. Reject obviously oversized requests before parsing the body.
   const contentLength = Number(req.headers.get("content-length") ?? "0");
   if (contentLength > MAX_REQUEST_BYTES) {
     return errorResponse(ERROR_MESSAGES.fileSize, 413);
@@ -55,21 +65,21 @@ export async function POST(req: Request) {
     return errorResponse(ERROR_MESSAGES.fileType, 400);
   }
 
-  // 3. Per-file size check (the client MIME header is not trusted).
+  // 4. Per-file size check (the client MIME header is not trusted).
   for (const f of [image1, image2]) {
     if (f.size === 0 || f.size > MAX_BYTES) {
       return errorResponse(ERROR_MESSAGES.fileSize, 400);
     }
   }
 
-  // 4. Magic-byte sniff — verify each file is actually JPEG or WebP.
+  // 5. Magic-byte sniff — verify each file is actually JPEG or WebP.
   const buf1 = new Uint8Array(await image1.arrayBuffer());
   const buf2 = new Uint8Array(await image2.arrayBuffer());
   if (!sniffImageType(buf1) || !sniffImageType(buf2)) {
     return errorResponse(ERROR_MESSAGES.fileType, 400);
   }
 
-  // 5. Build a clean outbound form with sanitized filenames (strip path components).
+  // 6. Build a clean outbound form with sanitized filenames (strip path components).
   const outbound = new FormData();
   outbound.append(
     "image1",
@@ -95,7 +105,7 @@ export async function POST(req: Request) {
       return errorResponse(ERROR_MESSAGES.processing, 502);
     }
 
-    // 6. Allowlist upstream content-type before streaming bytes back.
+    // 7. Allowlist upstream content-type before streaming bytes back.
     const upstreamType = (upstream.headers.get("content-type") ?? "")
       .split(";")[0]
       .trim()
